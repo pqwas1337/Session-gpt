@@ -1,0 +1,25 @@
+@media (max-width: 600px) {
+
+    .card {
+        padding:15px;
+        border-radius:12px;
+    }
+
+    .question {
+        font-size:18px;
+    }
+
+    .answerBtn {
+        font-size:14px;
+        padding:12px;
+    }
+
+    .btn {
+        font-size:14px;
+        padding:10px;
+    }
+
+    .actions {
+        flex-direction:column;
+    }
+}
