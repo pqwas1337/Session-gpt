@@ -17,19 +17,34 @@ document.addEventListener("DOMContentLoaded", () => {
 /* ---------------- START TEST ---------------- */
 
 async function loadTest() {
-    const response = await fetch("data/russian.json");
-    const data = await response.json();
+    try {
+        const path = window.location.hostname.includes("github")
+            ? "/Session-gpt/data/russian.json"
+            : "./data/russian.json";
 
-    questions = data.map(q => shuffleQuestion(q));
-    shuffle(questions);
+        const response = await fetch(path);
 
-    current = 0;
-    score = 0;
-    elapsed = 0;
-    finished = false;
+        if (!response.ok) {
+            throw new Error("JSON не найден: " + response.status);
+        }
 
-    showQuestion();
-    startTimer();
+        const data = await response.json();
+
+        questions = data.map(q => shuffleQuestion(q));
+        shuffle(questions);
+
+        current = 0;
+        score = 0;
+        elapsed = 0;
+        finished = false;
+
+        showQuestion();
+        startTimer();
+
+    } catch (e) {
+        console.error(e);
+        alert("Ошибка загрузки теста (см. консоль)");
+    }
 }
 
 /* ---------------- SHUFFLE ---------------- */
