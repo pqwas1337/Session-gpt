@@ -3,26 +3,40 @@ let current = 0;
 let score = 0;
 let timer = null;
 let finished = false;
-
 let elapsed = 0;
 
-document.addEventListener("DOMContentLoaded", () => {
-    updateStats();
+let currentType = "russian";
 
-    document
-        .getElementById("russianBtn")
-        .addEventListener("click", loadTest);
+const TESTS = {
+    russian: window.location.hostname.includes("github")
+        ? "/Session-gpt/data/russian.json"
+        : "./data/russian.json",
+
+    physics: window.location.hostname.includes("github")
+        ? "/Session-gpt/data/physics.json"
+        : "./data/physics.json"
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    updateStats("russian");
+    updateStats("physics");
+
+    document.getElementById("russianBtn")
+        ?.addEventListener("click", () => loadTest("russian"));
+
+    document.getElementById("physicsBtn")
+        ?.addEventListener("click", () => loadTest("physics"));
 });
 
-/* ---------------- START TEST ---------------- */
+/* ---------------- LOAD ---------------- */
 
-async function loadTest() {
+async function loadTest(type = "russian") {
+
+    currentType = type;
+
     try {
-        const path = window.location.hostname.includes("github")
-            ? "/Session-gpt/data/russian.json"
-            : "./data/russian.json";
-
-        const response = await fetch(path);
+        const response = await fetch(TESTS[type]);
 
         if (!response.ok) {
             throw new Error("JSON не найден: " + response.status);
@@ -38,12 +52,12 @@ async function loadTest() {
         elapsed = 0;
         finished = false;
 
-        showQuestion();
+        showQuestion(type);
         startTimer();
 
     } catch (e) {
         console.error(e);
-        alert("Ошибка загрузки теста (см. консоль)");
+        alert("Ошибка загрузки теста");
     }
 }
 
@@ -57,25 +71,29 @@ function shuffle(array) {
 }
 
 function shuffleQuestion(question) {
-    const answers = question.answers.map((text, index) => ({
-        text,
-        correct: index === question.correct
-    }));
+
+    const answers = question.answers.map((a, index) => {
+        if (typeof a === "string") {
+            return {
+                text: a,
+                correct: index === question.correct
+            };
+        }
+        return a;
+    });
 
     shuffle(answers);
-
-    question.answers = answers.map(a => a.text);
-    question.correct = answers.findIndex(a => a.correct);
+    question.answers = answers;
 
     return question;
 }
 
-/* ---------------- SHOW QUESTION ---------------- */
+/* ---------------- SHOW ---------------- */
 
-function showQuestion() {
+function showQuestion(type) {
 
     if (current >= questions.length) {
-        finishTest();
+        finishTest(type);
         return;
     }
 
@@ -99,23 +117,15 @@ function showQuestion() {
             <div class="answers">
                 ${q.answers.map((a, i) => `
                     <button class="answerBtn" data-index="${i}">
-                        ${a}
+                        ${a.text}
                     </button>
                 `).join("")}
             </div>
 
             <div class="actions">
-                <button id="nextBtn" class="btn next" style="display:none;">
-                    Далее →
-                </button>
-
-                <button id="endTestBtn" class="btn danger">
-                    Закончить
-                </button>
-
-                <button id="menuBtn" class="btn ghost">
-                    В меню
-                </button>
+                <button id="nextBtn" class="btn next" style="display:none;">Далее →</button>
+                <button id="endTestBtn" class="btn danger">Закончить</button>
+                <button id="menuBtn" class="btn ghost">В меню</button>
             </div>
 
         </div>
@@ -130,14 +140,14 @@ function showQuestion() {
     document.getElementById("nextBtn")
         .addEventListener("click", () => {
             current++;
-            showQuestion();
+            showQuestion(type);
         });
+
+    document.getElementById("endTestBtn")
+        .addEventListener("click", () => finishTest(type));
 
     document.getElementById("menuBtn")
         .addEventListener("click", () => location.reload());
-
-    document.getElementById("endTestBtn")
-        .addEventListener("click", finishTest);
 }
 
 /* ---------------- ANSWER ---------------- */
@@ -145,7 +155,9 @@ function showQuestion() {
 function answer(button) {
 
     const index = Number(button.dataset.index);
-    const correct = questions[current].correct;
+    const answers = questions[current].answers;
+
+    const isCorrect = answers[index].correct;
 
     document.getElementById("nextBtn").style.display = "block";
 
@@ -154,39 +166,39 @@ function answer(button) {
 
         const i = Number(btn.dataset.index);
 
-        if (i === correct) {
+        if (answers[i].correct) {
             btn.style.background = "#22c55e";
-            btn.style.color = "white";
         }
 
-        if (i === index && index !== correct) {
+        if (i === index && !isCorrect) {
             btn.style.background = "#ef4444";
-            btn.style.color = "white";
         }
     });
 
-    if (index === correct) score++;
+    if (isCorrect) score++;
 
-    // 🔥 ВАЖНО: убираем фокус (это и есть твоя фиолетовая подсветка)
     button.blur();
 }
 
 /* ---------------- FINISH ---------------- */
 
-function finishTest() {
+function finishTest(type) {
 
     if (finished) return;
     finished = true;
 
     if (timer) clearInterval(timer);
 
-    const best = Number(localStorage.getItem("bestRussian") || 0);
-    const attempts = Number(localStorage.getItem("attemptsRussian") || 0) + 1;
+    const bestKey = "best_" + type;
+    const attemptsKey = "attempts_" + type;
 
-    localStorage.setItem("attemptsRussian", attempts);
+    const best = Number(localStorage.getItem(bestKey) || 0);
+    const attempts = Number(localStorage.getItem(attemptsKey) || 0) + 1;
+
+    localStorage.setItem(attemptsKey, attempts);
 
     if (score > best) {
-        localStorage.setItem("bestRussian", score);
+        localStorage.setItem(bestKey, score);
     }
 
     document.body.innerHTML = `
@@ -207,15 +219,15 @@ function finishTest() {
     </div>
     `;
 
-    updateStats();
+    updateStats(type);
 }
 
 /* ---------------- STATS ---------------- */
 
-function updateStats() {
+function updateStats(type) {
 
-    const best = Number(localStorage.getItem("bestRussian") || 0);
-    const attempts = Number(localStorage.getItem("attemptsRussian") || 0);
+    const best = Number(localStorage.getItem("best_" + type) || 0);
+    const attempts = Number(localStorage.getItem("attempts_" + type) || 0);
 
     const percent = Math.round((best / 80) * 100);
 
@@ -233,12 +245,10 @@ function updateStats() {
 function startTimer() {
     if (timer) clearInterval(timer);
 
-    timer = setInterval(() => {
-        elapsed++;
-    }, 1000);
+    timer = setInterval(() => elapsed++, 1000);
 }
 
-/* ---------------- STYLES ---------------- */
+/* ---------------- STYLE ---------------- */
 
 function injectStyles() {
     if (document.getElementById("style")) return;
@@ -303,39 +313,13 @@ function injectStyles() {
     }
 
     .answerBtn {
-        padding: 14px;
-        border: none;
-        border-radius: 12px;
-        background: #1f2937;
-        color: white;
-        cursor: pointer;
-        text-align: left;
-
-        outline: none !important;
-        box-shadow: none !important;
-
-        transition: background 0.2s ease, transform 0.05s ease;
-
-        -webkit-tap-highlight-color: transparent !important;
-    }
-
-    .answerBtn:hover {
-        background: #374151;
-    }
-
-    .answerBtn:active {
-        transform: scale(0.99);
-    }
-
-    .answerBtn:focus,
-    .answerBtn:focus-visible {
-        outline: none !important;
-        box-shadow: none !important;
-    }
-
-    button {
-        outline: none !important;
-        -webkit-tap-highlight-color: transparent !important;
+        padding:14px;
+        border:none;
+        border-radius:12px;
+        background:#1f2937;
+        color:white;
+        cursor:pointer;
+        text-align:left;
     }
 
     .actions {
